@@ -38,6 +38,49 @@ RISC-V 有三种 CPU 可以执行指令的模式：机器模式（Machine Mode�
 
 #### 3.1 页表硬件
 
+![](/home/lh/Mardown_Notes/MIT 6.S081/imgs/3.1.1.png)
+
+RISC-V页表在逻辑上是一个由 2^27 个页表条目（Page Table Entries/PTE）组成的数组，每个PTE包含一个44位的物理页码（Physical Page Number/PPN）和一些标志。
+
+![](/home/lh/Mardown_Notes/MIT 6.S081/imgs/3.2.png)
+
+页表以三级的树型结构存储在物理内存中。该树的根是一个4096字节(512 个 PTE，一个 PTE 8 个字节)的页表页，其中包含512个PTE，每个PTE中包含该树下一级页表页的物理地址。
+
+**为了告诉硬件使用页表，内核必须将根页表页的物理地址写入到`satp`寄存器中（`satp`的作用是存放根页表页在物理内存中的地址）。**
+
+#### 3.2 内核地址空间
+
+内核使用“直接映射”获取内存和内存映射设备寄存器；也就是说，将资源映射到等于物理地址的虚拟地址。
+
+#### 3.3 代码：创建一个地址空间
+
+```cpp
+int
+mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)
+{
+  uint64 a, last;
+  pte_t *pte;
+
+  if(size == 0)
+    panic("mappages: size");
+  
+  a = PGROUNDDOWN(va);
+  last = PGROUNDDOWN(va + size - 1);
+  for(;;){
+    if((pte = walk(pagetable, a, 1)) == 0)
+      return -1;
+    if(*pte & PTE_V)
+      panic("mappages: remap");
+    *pte = PA2PTE(pa) | perm | PTE_V;//将物理地址放进PTE前44位，加上权限位和有效位
+    if(a == last)
+      break;
+    a += PGSIZE;
+    pa += PGSIZE;
+  }
+  return 0;
+}
+```
+
 
 
 ### 第四章 陷阱指令和系统调用
