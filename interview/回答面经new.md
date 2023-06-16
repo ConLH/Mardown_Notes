@@ -173,6 +173,47 @@ Effective 的解释是：
 
 将一个对象赋值给另外一个对象。
 
+### C++空类包含哪些函数
+
+编译器会生成 6 个成员函数：
+
+- 缺省构造函数。
+- 缺省拷贝构造函数。
+- 缺省析构函数。
+- 缺省赋值运算符。
+- 缺省取址运算符。
+- 缺省取址运算符 const。
+
+```cpp
+class Empty
+{};
+
+class Empty
+{
+  public:
+    Empty();                            //缺省构造函数
+    Empty(const Empty &rhs);            //拷贝构造函数
+    ~Empty();                           //析构函数 
+    Empty& operator=(const Empty &rhs); //赋值运算符
+    Empty* operator&();                 //取址运算符
+    const Empty* operator&() const;     //取址运算符(const版本)
+};
+```
+
+### 虚函数能否私有化？
+
+可以。
+
+### C++中成员函数能够同时用static和const进行修饰？
+
+No 
+
+  static修饰的函数表示该函数是属于类的，而不是属于某一个对象的，没有this指针。 
+
+  const修饰的函数表示该函数不能改变 this 中的内容，会有一个隐含的const this指针。 
+
+  两者是冲突矛盾的。
+
 ## C++11特性
 
 [c++11新特性](https://cloud.tencent.com/developer/article/1745592)
@@ -484,6 +525,39 @@ auto varname = value;
 decltype(exp) varname [= value];
 ```
 
+#### auto 不允许使用的四个场景
+
+- 不能作为函数形参使用；
+
+  ```cpp
+  int func(auto a, auto b)
+  ```
+
+- 不能用于类的非静态成员变量的初始化；
+
+  ```cpp
+  class Test
+  {
+  	auto a = 0;//error
+  	static auto b = 2;//error,类的静态非常量成员不允许在类内部直接初始化
+  	static const auto c = 10;//ok
+  };
+  ```
+
+- 不能用于定义数组；
+
+  ```cpp
+  int func()
+  {
+  	int array[] = { 1,2,3,4,5 };//ok
+  	auto t1 = array;//ok，t1 -> int *
+  	auto t2[] = array;//error，auto无法定义数组
+  	auto t3[] = { 1,2,3,4,5 };//error，auto无法定义数组
+  }
+  ```
+
+- 不能用于推导模板参数。
+
 ### const 和 define 的区别
 
 const 在 C 语言中表示只读，编译器禁止对它修饰的变量进行修改，在 C++ 中增加了常量的语义;
@@ -633,9 +707,26 @@ C 语言在进行函数调用的时候，是将实参的值复制一份，并将
 
 ### shared_ptr
 
+> https://cloud.tencent.com/developer/article/1688444
+
 多个智能指针可以共享同一个对象，对象的最末一个拥有着有责任销毁对象，并清理与该对象相关的所有资源。
 
 * 支持定制型删除器（custom deleter），可防范 Cross-DLL 问题（对象在动态链接库（DLL）中被 new 创建，却在另一个 DLL 内被 delete 销毁）、自动解除互斥锁
+
+#### 实现原理
+
+内部包含一个指向引用计数的指针、一个指向共享资源的指针和一个锁。
+
+shared_ptr的原理：是**通过引用计数的方式来实现多个shared_ptr对象之间共享资源**。
+
+1. shared_ptr在其内部，**给每个资源都维护了着一份计数，用来记录该份资源被几个对象共享**。
+2. 在对象被销毁时(也就是**析构函数调用**)，就说明自己不使用该资源了，**对象的引用计数减一**。
+3. **如果引用计数是0**，就说明自己是最后一个使用该资源的对象，**必须释放该资源**；
+4. 如果不是0，就说明除了自己还有其他对象在使用该份资源，不能释放该资源，否则其他对象就成野指针了。
+
+#### 是否线程安全
+
+多个线程同时修改引用计数，线程不安全，需要加锁。
 
 ### auto_ptr 与 unique_ptr 比较
 
@@ -676,6 +767,17 @@ C 语言在进行函数调用的时候，是将实参的值复制一份，并将
 ### 手写智能指针
 
 [CPlusPlusThings/learn_class/modern_C++_30/smart_ptr at master · Light-City/CPlusPlusThings (github.com)](https://github.com/Light-City/CPlusPlusThings/tree/master/learn_class/modern_C++_30/smart_ptr)
+
+## 模板
+
+### 类模板和函数模板的区别
+
+- 类模板不支持模板参数自动推导；
+- 类模板在模板参数列表可以有默认参数。
+
+#### 模板特例化
+
+模板特例化：模板的一个或多个模板参数被指定为特定的类型。
 
 ## RAII 机制
 
@@ -1266,11 +1368,13 @@ int dijkstra() {
 
 **MSS(Maximum Segment Size)，最大报文长度**
 
-收发双方协商通信时每一个报文段所能承载的最大数据长度。
+收发双方协商通信时每一个报文段所能承载的最大数据长度。TCP 报文的最大长度。
 
 **MTU(Maximum Transmission Unit)，最大传输单元**
 
-一个网络包的最大长度，以太网中一般为 1500 字节。
+一个网络包的最大长度，以太网中一般为 1500 字节。IP 报文的最大长度。
+
+![](./images/计算机网络/MTU+MSS.webp)
 
 **RTT(Round-Trip Time)，往返时延**
 
@@ -1567,6 +1671,15 @@ HTTPS 采用混合加密。对数据进行对称加密，对称加密所需使�
 
 ## TCP
 
+### TCP 格式
+
+<img src="./images/计算机网络/TCP.webp" style="zoom:50%;" />
+
+- *ACK*：该位为 `1` 时，「确认应答」的字段变为有效，TCP 规定除了最初建立连接时的 `SYN` 包之外该位必须设置为 `1` 。
+- *RST*：该位为 `1` 时，表示 TCP 连接中出现异常必须强制断开连接。
+- *SYN*：该位为 `1` 时，表示希望建立连接，并在其「序列号」的字段进行序列号初始值的设定。
+- *FIN*：该位为 `1` 时，表示今后不会再有数据发送，希望断开连接。当通信结束希望断开连接时，通信双方的主机之间就可以相互交换 `FIN` 位为 1 的 TCP 段。
+
 ### 如何保证可靠性？
 
 校验和、序列号/确认应答号、超时重传、连接管理、流量控制、拥塞控制等方法。
@@ -1687,7 +1800,7 @@ TCP 每发送一条报文，就会启动定时器，当超过设定时间，没�
 
 目的：拥塞控制就是防止太多的数据进入到网络中，使网络中的路由器或者链路不会过载。
 
-<img src="E:\Desktop\转码\面经回答\images\计算机网络\拥塞避免.png" style="zoom: 80%;" />
+<img src="\images\计算机网络\拥塞避免.png" style="zoom: 80%;" />
 
 四个算法：
 
@@ -1706,13 +1819,13 @@ TCP 每发送一条报文，就会启动定时器，当超过设定时间，没�
     - cwnd 重置为 1MSS。
   - 快速重传
     - ssthresh 设为 cwnd / 2；
-    - cwnd = cwnd / 2 + 3；
+    - cwnd = cwnd / 2 + 3 MMS；
     - 进入快速恢复。
 
 - 快速恢复
 
   - 对收到的每个冗余 ACK，cwnd 的值增加一个 MSS；
-  - 最终对丢失报文段的一个 ACK 到达时，TCP 再降低 cwnd 后进入拥塞避免状态。
+  - 最终对丢失报文段的一个 ACK 到达时，TCP 再降低 cwnd 为 ssthreash 后进入拥塞避免状态。
 
 ### 粘包
 
@@ -1749,9 +1862,7 @@ TCP 每发送一条报文，就会启动定时器，当超过设定时间，没�
 
 ### SYN 攻击
 
-<img src="\images\计算机网络\SYN队列.png" style="zoom: 50%;" />
-
-![]()
+<img src=".\images\计算机网络\SYN队列.png" style="zoom: 50%;" />
 
 **概念**
 
@@ -1808,6 +1919,20 @@ TIME_WAIT 是主动关闭连接方才会出现的状态，所以如果服务器�
 
 当服务端出现大量 CLOSE_WAIT 状态的连接的时候，通常都是代码的问题，这时候我们需要针对具体的代码一步一步的进行排查和定位，主要分析的方向就是服务端为什么没有调用 close()。
 
+### 建立连接后，客户端拔掉网线后会怎么样？
+
+- 拔掉网线后，有数据传输
+
+  服务端触发超时重传机制
+
+  - 如果在服务端重传报文的过程中，客户端把网线插了回去，则一切正常；
+  - 如果在服务端重传报文的过程中，客户端没有把网线插回去，服务端超时重传报文次数达到一定阈值后，服务端 TCP 连接就会断开；客户端插回网线后向服务端发送数据，由于服务端已经没有与客户端相同四元祖的 TCP 连接了，因此服务端内核就会回复 `RST` 报文，客户端收到后就会释放该 TCP 连接。
+
+- 拔掉网线后，没有数据传输
+
+  - 没有开启 TCP keepalive 机制，则客户端和服务端连接会一直保存；
+  - 如果开启 TCP keepalive 机制，会发送探测报文，如果探测报文达到探测次数后就会断开连接。
+
 ## UDP
 
 ### UDP 怎么样实现可靠的传输
@@ -1840,6 +1965,15 @@ TIME_WAIT 是主动关闭连接方才会出现的状态，所以如果服务器�
 - 确认 IP 包是否送达目标地址；
 - 返回发送过程中 IP 包丢失原因；
 - 改善网络设置。
+
+### 输入 Ping 后发生了什么？
+
+- 构建一个 ICMP 的请求数据包，然后将数据包和目标 IP 交给 IP 层协议；
+- IP 层将源地址、目标地址加上一些控制信息构建成一个 IP 数据包；
+- 通过 ARP 映射表找出目标 IP 的 MAC 地址交由数据链路层组成数据帧；
+- 目标主机收到数据帧后，取出 IP 数据包交给 IP 层，再取出 ICMP 数据包交给 ICMP 协议，最后构建一个 ICMP 应答数据包回给源主机。
+
+> https://cloudsjhan.github.io/2018/09/16/%E6%8A%80%E6%9C%AF%E5%91%A8%E5%88%8A%E4%B9%8B%E5%BD%93%E4%BD%A0ping%E7%9A%84%E6%97%B6%E5%80%99%EF%BC%8C%E5%8F%91%E7%94%9F%E4%BA%86%E4%BB%80%E4%B9%88%EF%BC%9F/
 
 ### DNS
 
@@ -2152,17 +2286,17 @@ Singleton Singleton::instance; // 在程序入口之前就完成单例对象的�
 
 #### TLB
 
-<img src="E:\Desktop\转码\面经回答\images\操作系统\TLB.png" style="zoom:67%;" />
+<img src=".\images\操作系统\TLB.png" style="zoom:67%;" />
 
 - TLB（*Translation Lookaside Buffer*），通常称为页表缓存、转址旁路缓存、快表等，专门存放程序最常访问的页表项的 Cache；
 - 内存管理单元（*Memory Management Unit*）芯片，它用来完成地址转换和 TLB 的访问与交互。
 
 ### 内存布局
 
-<img src="E:\Desktop\转码\面经回答\images\操作系统\内存布局.png" style="zoom:67%;" />
+<img src="\images\操作系统\内存布局.png" style="zoom:67%;" />
 
 - 代码段，包括二进制可执行代码；
-- 数据段，包括已初始化的静态常量和全局变量；
+- 数据段，包括已初始化的静态变量和全局变量；
 - BSS 段，包括未初始化的静态变量和全局变量；
 - 堆段，包括动态分配的内存，从低地址开始向上增长；
 - 文件映射段，包括动态库、共享内存等，从低地址开始向上增长；
@@ -2315,7 +2449,7 @@ void* mmap(void* addr, size_t length, int prot, int flags, int fd, off_t offset)
 
 **转换**
 
-<img src="E:\Desktop\转码\面经回答\images\操作系统\进程状态转换.png"  />
+<img src="\images\操作系统\进程状态转换.png"  />
 
 ### 孤儿进程
 
@@ -2392,6 +2526,10 @@ void* mmap(void* addr, size_t length, int prot, int flags, int fd, off_t offset)
 - 线程进程都是同步机制，而协程是异步机制；
 - 线程是抢占式，协程是非抢占式，（需要用户自己释放使用权来切换到其他协程，因此同一时间其实只有一个协程拥有运行权，相当于单线程的能力）；
 - 线程数量上千，协程上万。
+
+### 进程上下文切换
+
+
 
 ### 进程间通信方式
 
@@ -2665,6 +2803,53 @@ int main(void)
 
 - 有序资源分配法：线程 A 和 线程 B 总是以相同的顺序申请自己想要的资源；
 - 银行家算法：在进程提出资源申请时，先预判此分配是否会导致系统进入不安全状态。如果会进入不安全状态，就暂时不答应这次请求，让该进程先阻塞等待。
+
+#### 死锁简单代码实现
+
+```cpp
+#include <iostream>
+#include <thread>
+#include <mutex>
+
+std::mutex mtx1, mtx2;
+
+void threadFunc1()
+{
+    mtx1.lock();
+    std::cout << "Thread 1 has acquired mutex 1" << std::endl;
+
+    mtx2.lock();
+    std::cout << "Thread 1 has acquired mutex 2" << std::endl;
+
+    mtx2.unlock();
+    mtx1.unlock();
+}
+
+void threadFunc2()
+{
+    mtx2.lock();
+    std::cout << "Thread 2 has acquired mutex 2" << std::endl;
+
+    mtx1.lock();
+    std::cout << "Thread 2 has acquired mutex 1" << std::endl;
+
+    mtx1.unlock();
+    mtx2.unlock();
+}
+
+int main()
+{
+    std::thread t1(threadFunc1);
+    std::thread t2(threadFunc2);
+
+    t1.join();
+    t2.join();
+
+    return 0;
+}
+```
+
+
 
 ### 各种锁
 
@@ -3101,7 +3286,7 @@ int epoll_wait(int epfd, struct epoll_event* events, int maxevents, int timeout)
 
 [EPOLL原理详解](https://www.cnblogs.com/Hijack-you/p/13057792.html)
 
-<img src="E:\Desktop\转码\面经回答\images\网络编程\epoll原理.png" style="zoom: 67%;" />
+<img src="\images\网络编程\epoll原理.png" style="zoom: 67%;" />
 
 epoll 是一种更加高效的 IO 复用技术，epoll 的使用步骤及原理如下： 
 
@@ -3157,6 +3342,137 @@ epoll_ctl() 用于向内核注册新的描述符或者是改变某个文件描�
 [C++ std::thread | 菜鸟教程 (runoob.com)](https://www.runoob.com/w3cnote/cpp-std-thread.html)
 
 ### atomic
+
+### 三个交替打印 ABC
+
+```cpp
+#include<stdio.h>
+#include<unistd.h>
+#include<pthread.h>
+#include<semaphore.h>
+#include<stdlib.h>
+
+sem_t sem[3];//信号量
+int count1=10,count2=10,count3=10;//控制输出次数，不设置可能无限输出
+void* fun1(void* arg)
+{
+     while(count1>0)//while(1)则无限输出
+     {
+           sem_wait(&sem[0]);
+           write(1,"1",1);
+           sem_post(&sem[1]);
+	   count1--;
+     }
+}
+void* fun2(void* arg)
+{
+     while(count2>0)
+     {
+          sem_wait(&sem[1]);
+          write(1,"2",1);
+          sem_post(&sem[2]);
+	  count2--;
+     }
+}
+void* fun3(void* arg)
+{
+      while(count3>0)
+      {
+          sem_wait(&sem[2]);
+          write(1,"3",1);
+          sem_post(&sem[0]);
+	  count3--;
+      }
+}
+int main()
+{
+      pthread_t id[3];
+
+      sem_init(&sem[0],0,1);
+      sem_init(&sem[1],0,0);
+      sem_init(&sem[2],0,0);
+ 
+ 	  //创建三个线程
+      pthread_create(&id[0],NULL,fun1,NULL);
+      pthread_create(&id[1],NULL,fun2,NULL);
+      pthread_create(&id[2],NULL,fun3,NULL);
+ 
+      pthread_join(id[0],NULL);
+      pthread_join(id[1],NULL);
+      pthread_join(id[2],NULL);
+ 
+      sem_destroy(&sem[0]);
+      sem_destroy(&sem[1]);
+      sem_destroy(&sem[2]);
+
+      printf("\n");
+      exit(0);
+}
+```
+
+```cpp
+#include <iostream>
+#include <thread>
+#include <condition_variable>
+std::mutex mtx;
+std::condition_variable cv;
+int ready = 0;
+void PrintString_1()
+{
+        std::unique_lock<std::mutex> lk(mtx);
+        int cnt = 0;
+        while(cnt<10)
+        {
+                while(ready != 0)
+                        cv.wait(lk);
+                std::cout<<"A"<<std::endl;
+                ready = 1;
+                cnt++;
+                cv.notify_all();
+        }
+}
+
+void PrintString_2()
+{
+        std::unique_lock<std::mutex> lk(mtx);
+        int cnt = 0;
+        while(cnt<10)
+        {
+                while(ready != 1)
+                        cv.wait(lk);
+                std::cout<<"B"<<std::endl;
+                ready = 2;
+                cnt++;
+                cv.notify_all();
+        }
+}
+
+void PrintString_3()
+{
+        std::unique_lock<std::mutex> lk(mtx);
+        int cnt = 0;
+        while(cnt<10)
+        {
+                while(ready != 2)
+                        cv.wait(lk);
+                std::cout<<"C"<<std::endl;
+                ready = 0;
+                cnt++;
+                cv.notify_all();
+        }
+}
+
+int main()
+{
+        std::thread  t1(PrintString_1);
+        std::thread  t2(PrintString_2);
+        std::thread  t3(PrintString_3);
+        t1.join();
+        t2.join();
+        t3.join();
+        return 0;
+}
+```
 
 
 
@@ -3373,6 +3689,11 @@ mpstat	实时监测多处理器系统上每个 CPU 的使用情况。
   l   展示详细信息
   a  显示隐藏文件
   ```
+
+### 查看网络状态
+
+- `ping`
+- `traceroute`：用于显示数据包到主机间的路径。
 
 # 数据库
 
